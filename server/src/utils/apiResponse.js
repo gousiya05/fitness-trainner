@@ -1,0 +1,12 @@
+/**
+ * API Response Helpers
+ * Standardise the JSON structure returned to the client.
+ */
+
+const success = (res, data, statusCode = 200) =>
+  res.status(statusCode).json({ success: true, ...data });
+
+const error = (res, message, statusCode = 400) =>
+  res.status(statusCode).json({ success: false, error: message });
+
+module.exports = { success, error };

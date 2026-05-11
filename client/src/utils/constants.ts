@@ -31,6 +31,12 @@ export const FITNESS_LEVELS = [
   { value: 'advanced',     label: 'Advanced',     desc: '2+ years training' },
 ] as const
 
+export const GENDERS = [
+  { value: 'male',   label: 'Male' },
+  { value: 'female', label: 'Female' },
+  { value: 'other',  label: 'Other' },
+] as const
+
 export const EXERCISE_TYPES = [
   { value: 'cardio',    label: 'Cardio',    icon: '🏃' },
   { value: 'strength',  label: 'Strength',  icon: '🏋️' },

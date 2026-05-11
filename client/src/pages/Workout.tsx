@@ -1,197 +1,366 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   MdFitnessCenter, MdAutoAwesome, MdRefresh, MdSave,
-  MdLocalFireDepartment, MdCheckCircle,
+  MdLocalFireDepartment, MdCheckCircle, MdTimer, MdPsychology,
+  MdTrendingUp, MdInfo
 } from 'react-icons/md'
-import { workoutApi } from '@/api/workout'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/Button'
-import { Select } from '@/components/ui/Input'
+import { Input, Select } from '@/components/ui/Input'
 import { Card } from '@/components/ui/Card'
-import { ExerciseCard } from '@/components/fitness/WorkoutCard'
-import type { WorkoutPlan, Exercise, FitnessGoal, ActivityLevel, FitnessLevel } from '@/types'
-import { GOALS, ACTIVITY_LEVELS, FITNESS_LEVELS } from '@/utils/constants'
+import { workoutService } from '@/services/workoutService'
+import { workoutApi } from '@/api/workout'
+import { GOALS, ACTIVITY_LEVELS, FITNESS_LEVELS, GENDERS } from '@/utils/constants'
 import toast from 'react-hot-toast'
-
-const GOAL_COLORS: Record<string, string> = {
-  weight_loss: '#ff6b35', muscle_gain: '#00ff87',
-  endurance: '#06b6d4', flexibility: '#a78bfa', general: '#fbbf24',
-}
+import clsx from 'clsx'
 
 export default function Workout() {
   const { user } = useAuth()
-  const [plan, setPlan] = useState<WorkoutPlan | null>(null)
-  const [exercises, setExercises] = useState<Exercise[]>([])
+  const [aiPlan, setAiPlan] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [generationStep, setGenerationStep] = useState(0)
+  
   const [form, setForm] = useState({
-    goal:           (user?.profile?.goal         || 'general')     as FitnessGoal,
-    activity_level: (user?.profile?.activityLevel || 'moderate')   as ActivityLevel,
-    fitness_level:  (user?.profile?.fitnessLevel  || 'beginner')   as FitnessLevel,
+    age: user?.profile?.age || 25,
+    weight: user?.profile?.weight || 70,
+    height: user?.profile?.height || 175,
+    gender: user?.profile?.gender || 'male',
+    goal: user?.profile?.goal || 'general',
+    activity_level: user?.profile?.activityLevel || 'moderate',
+    experience: user?.profile?.fitnessLevel || 'beginner',
   })
 
-  const generate = async () => {
-    setLoading(true); setPlan(null)
-    try {
-      const { data } = await workoutApi.recommend()
-      setPlan(data)
-      setExercises(data.exercises.map(e => ({ ...e, completed: false })))
-      toast.success('AI workout generated! 🔥')
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to generate plan')
-    } finally {
-      setLoading(false) }
+  const steps = [
+    "Analyzing physiological data...",
+    "Training neural fitness engine...",
+    "Optimizing exercise selection...",
+    "Finalizing personalized plan..."
+  ]
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout
+    if (loading) {
+      interval = setInterval(() => {
+        setGenerationStep(prev => (prev + 1) % steps.length)
+      }, 2000)
+    }
+    return () => clearInterval(interval)
+  }, [loading])
+
+  const validateForm = () => {
+    if (form.age < 16 || form.age > 100) {
+      toast.error('Please enter a valid age (16-100)')
+      return false
+    }
+    if (form.weight < 30 || form.weight > 300) {
+      toast.error('Please enter a valid weight (30-300kg)')
+      return false
+    }
+    if (form.height < 100 || form.height > 250) {
+      toast.error('Please enter a valid height (100-250cm)')
+      return false
+    }
+    return true
   }
 
-  const toggleComplete = (idx: number) => {
-    setExercises(prev => prev.map((e, i) => i === idx ? { ...e, completed: !e.completed } : e))
+  const generate = async () => {
+    if (!validateForm()) return
+    
+    setLoading(true)
+    setAiPlan(null)
+    setGenerationStep(0)
+    
+    try {
+      const data = await workoutService.generatePlan(form as any)
+      if (data.success) {
+        setAiPlan(data.plan)
+        toast.success('AI Plan generated successfully! 🔥')
+      } else {
+        throw new Error('Failed to generate plan')
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Connection to AI server failed')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const savePlan = async () => {
-    if (!plan) return
+    if (!aiPlan) return
     setSaving(true)
     try {
+      // Mapping the AI plan to the backend storage format
+      const exercises = aiPlan.weekly_schedule.flatMap((day: any) => 
+        day.exercises.map((exName: string) => ({
+          name: exName,
+          sets: 3,
+          reps: 12,
+          rest: 60,
+          muscle: day.focus,
+          calories: 10
+        }))
+      )
+
       await workoutApi.save({
-        title: `AI ${plan.goal.replace('_', ' ')} Plan`,
-        exercises: exercises,
-        goal: plan.goal,
-        totalCalories: plan.estimated_calories_per_session,
+        title: `AI ${aiPlan.goal} Plan`,
+        exercises: exercises.slice(0, 8), // Save first 8 exercises
+        goal: form.goal as any,
+        totalCalories: aiPlan.calories_target,
         aiGenerated: true,
       })
       toast.success('Workout saved to your history! 💪')
-    } catch { toast.error('Failed to save') }
-    finally { setSaving(false) }
+    } catch {
+      toast.error('Failed to save workout')
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const completedCount = exercises.filter(e => e.completed).length
-  const goalColor = GOAL_COLORS[form.goal] || '#00ff87'
-
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-8 pb-20">
       {/* Header */}
-      <div>
-        <h1 className="font-display font-bold text-2xl md:text-3xl flex items-center gap-2">
-          <MdAutoAwesome className="text-neon" /> AI Workout <span className="gradient-text">Generator</span>
+      <div className="text-center md:text-left">
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-neon/10 border border-neon/20 text-neon text-xs font-bold uppercase tracking-widest mb-4"
+        >
+          <MdPsychology className="text-sm" /> AI Neural Engine v2.0
+        </motion.div>
+        <h1 className="font-display font-black text-3xl md:text-5xl">
+          Personalized <span className="gradient-text">AI Workouts</span>
         </h1>
-        <p className="text-white/40 mt-1 text-sm">Random Forest ML creates your personalized training plan.</p>
+        <p className="text-white/40 mt-2 text-base md:text-lg max-w-2xl">
+          Our Random Forest ML model analyzes your biometrics to generate the most effective training split for your goals.
+        </p>
       </div>
 
-      {/* Controls */}
-      <Card className="!p-5 md:!p-6">
-        <h2 className="font-semibold text-sm text-white/60 mb-4 uppercase tracking-wider">Customize Your Plan</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
-          <Select
-            label="Goal"
-            value={form.goal}
-            onChange={e => setForm(p => ({ ...p, goal: e.target.value as FitnessGoal }))}
-            options={GOALS.map(g => ({ value: g.value, label: `${g.emoji} ${g.label}` }))}
-          />
-          <Select
-            label="Activity Level"
-            value={form.activity_level}
-            onChange={e => setForm(p => ({ ...p, activity_level: e.target.value as ActivityLevel }))}
-            options={ACTIVITY_LEVELS.map(a => ({ value: a.value, label: a.label }))}
-          />
-          <Select
-            label="Fitness Level"
-            value={form.fitness_level}
-            onChange={e => setForm(p => ({ ...p, fitness_level: e.target.value as FitnessLevel }))}
-            options={FITNESS_LEVELS.map(f => ({ value: f.value, label: f.label }))}
-          />
+      {/* Form Card */}
+      <Card className="!p-6 md:!p-8 overflow-hidden relative border-white/5 bg-black/40 backdrop-blur-xl">
+        <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
+          <MdFitnessCenter className="text-9xl" />
         </div>
-        <Button onClick={generate} loading={loading} icon={<MdAutoAwesome />}>
-          Generate AI Plan
-        </Button>
+        
+        <div className="relative z-10">
+          <h2 className="font-display font-bold text-xl mb-6 flex items-center gap-2">
+            <MdAutoAwesome className="text-neon" /> Configure Biometrics
+          </h2>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+            <Input
+              label="Age"
+              type="number"
+              value={form.age}
+              onChange={e => setForm(p => ({ ...p, age: parseInt(e.target.value) || 0 }))}
+              placeholder="e.g. 25"
+            />
+            <Input
+              label="Weight (kg)"
+              type="number"
+              value={form.weight}
+              onChange={e => setForm(p => ({ ...p, weight: parseFloat(e.target.value) || 0 }))}
+              placeholder="e.g. 70"
+            />
+            <Input
+              label="Height (cm)"
+              type="number"
+              value={form.height}
+              onChange={e => setForm(p => ({ ...p, height: parseFloat(e.target.value) || 0 }))}
+              placeholder="e.g. 175"
+            />
+            <Select
+              label="Gender"
+              value={form.gender}
+              onChange={e => setForm(p => ({ ...p, gender: e.target.value }))}
+              options={GENDERS.map(g => ({ value: g.value, label: g.label }))}
+            />
+            <Select
+              label="Fitness Goal"
+              value={form.goal}
+              onChange={e => setForm(p => ({ ...p, goal: e.target.value }))}
+              options={GOALS.map(g => ({ value: g.value, label: `${g.emoji} ${g.label}` }))}
+            />
+            <Select
+              label="Activity Level"
+              value={form.activity_level}
+              onChange={e => setForm(p => ({ ...p, activity_level: e.target.value }))}
+              options={ACTIVITY_LEVELS.map(a => ({ value: a.value, label: a.label }))}
+            />
+            <Select
+              label="Experience"
+              value={form.experience}
+              onChange={e => setForm(p => ({ ...p, experience: e.target.value }))}
+              options={FITNESS_LEVELS.map(f => ({ value: f.value, label: f.label }))}
+              wrapperClass="md:col-span-2"
+            />
+          </div>
+
+          <Button 
+            onClick={generate} 
+            loading={loading} 
+            size="lg"
+            className="w-full md:w-auto px-10 h-14 text-lg shadow-[0_0_20px_rgba(0,255,135,0.2)] hover:shadow-[0_0_30px_rgba(0,255,135,0.4)] transition-all"
+            icon={<MdAutoAwesome />}
+          >
+            Execute ML Generation
+          </Button>
+        </div>
       </Card>
 
-      {/* Loading */}
-      {loading && (
-        <div className="space-y-3">
-          {[1, 2, 3, 4].map(i => <div key={i} className="skeleton h-16 rounded-xl" />)}
-        </div>
-      )}
-
-      {/* Plan result */}
+      {/* Loading Experience */}
       <AnimatePresence>
-        {plan && !loading && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
-            {/* Plan summary */}
-            <div className="glass p-5 md:p-6" style={{ borderColor: `${goalColor}25` }}>
-              <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
-                <div>
-                  <span className="badge mb-2" style={{ background: `${goalColor}15`, color: goalColor, borderColor: `${goalColor}30` }}>
-                    AI-Generated Plan
-                  </span>
-                  <h2 className="font-display font-bold text-xl capitalize">
-                    {plan.goal.replace('_', ' ')} · {plan.fitness_level}
-                  </h2>
-                </div>
-                <div className="flex gap-5 text-center">
-                  <div><p className="font-display font-black text-3xl text-neon">{plan.weekly_sessions}</p><p className="text-white/35 text-xs">sessions/wk</p></div>
-                  <div><p className="font-display font-black text-3xl text-fire">{plan.estimated_calories_per_session}</p><p className="text-white/35 text-xs">kcal/session</p></div>
-                  <div><p className="font-display font-black text-3xl text-white">{exercises.length}</p><p className="text-white/35 text-xs">exercises</p></div>
-                </div>
-              </div>
-
-              {/* Progress bar */}
-              {completedCount > 0 && (
-                <div className="mb-4">
-                  <div className="flex justify-between text-xs text-white/40 mb-1.5">
-                    <span>Session progress</span>
-                    <span>{completedCount}/{exercises.length} completed</span>
-                  </div>
-                  <div className="progress-track">
-                    <motion.div
-                      className="progress-fill"
-                      style={{ background: goalColor, width: `${(completedCount / exercises.length) * 100}%` }}
-                      animate={{ width: `${(completedCount / exercises.length) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {plan.ai_tip && (
-                <div className="p-3 rounded-xl bg-black/25 text-sm text-white/55 flex gap-2">
-                  <MdAutoAwesome className="text-neon shrink-0 mt-0.5" /> {plan.ai_tip}
-                </div>
-              )}
+        {loading && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.05 }}
+            className="flex flex-col items-center justify-center py-20 text-center space-y-6"
+          >
+            <div className="relative">
+              <div className="w-24 h-24 rounded-full border-2 border-neon/10 border-t-neon animate-spin" />
+              <MdPsychology className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-4xl text-neon animate-pulse" />
             </div>
-
-            {/* Exercises */}
             <div className="space-y-2">
-              {exercises.map((ex, i) => (
-                <ExerciseCard key={i} exercise={ex} index={i} onComplete={toggleComplete} />
-              ))}
-            </div>
-
-            {/* Diet suggestions */}
-            <Card variant="dark" className="!p-5">
-              <h3 className="font-display font-semibold text-base mb-3 flex items-center gap-2">
-                <MdLocalFireDepartment className="text-fire" /> AI Diet Suggestions
+              <h3 className="text-xl font-display font-bold text-white tracking-wide">
+                {steps[generationStep]}
               </h3>
-              <ul className="space-y-2">
-                {plan.diet_suggestions.map((tip, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-white/55">
-                    <MdCheckCircle className="text-neon shrink-0 mt-0.5" /> {tip}
-                  </li>
-                ))}
-              </ul>
-            </Card>
-
-            {/* Save */}
-            <div className="flex gap-3">
-              <Button onClick={generate} variant="secondary" icon={<MdRefresh />}>Regenerate</Button>
-              <Button onClick={savePlan} loading={saving} icon={<MdSave />}>Save Workout</Button>
+              <div className="w-64 h-1.5 bg-white/5 rounded-full overflow-hidden mx-auto">
+                <motion.div 
+                  className="h-full bg-neon shadow-[0_0_10px_#00ff87]"
+                  initial={{ width: "0%" }}
+                  animate={{ width: "100%" }}
+                  transition={{ duration: 8, ease: "linear" }}
+                />
+              </div>
+              <p className="text-white/30 text-sm italic">Simulating metabolic outcomes...</p>
+            </div>
+            
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full max-w-2xl mt-10">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="h-32 bg-white/5 rounded-2xl border border-white/5 animate-pulse" />
+              ))}
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {!plan && !loading && (
-        <div className="text-center py-20 text-white/20">
-          <MdFitnessCenter className="text-7xl mx-auto mb-4 opacity-20" />
-          <p className="text-lg">Configure your preferences above and hit <span className="text-neon/60">Generate AI Plan</span></p>
+      {/* Results Dashboard */}
+      <AnimatePresence>
+        {aiPlan && !loading && (
+          <motion.div 
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-8"
+          >
+            {/* Summary Banner */}
+            <div className="relative group">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-neon to-cyan-500 rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-1000"></div>
+              <div className="relative glass-card p-6 md:p-10 rounded-3xl border border-white/10 flex flex-col md:flex-row items-center justify-between gap-8">
+                <div className="space-y-4 text-center md:text-left">
+                  <div className="flex flex-wrap justify-center md:justify-start gap-3">
+                    <span className="px-3 py-1 rounded-lg bg-neon/20 text-neon text-[10px] font-black uppercase tracking-widest border border-neon/30">
+                      ML Confidence: {aiPlan.ai_confidence}%
+                    </span>
+                    <span className="px-3 py-1 rounded-lg bg-white/5 text-white/60 text-[10px] font-black uppercase tracking-widest border border-white/10">
+                      Tier: {aiPlan.difficulty}
+                    </span>
+                  </div>
+                  <h2 className="text-4xl md:text-5xl font-display font-black">
+                    Your <span className="text-neon">{aiPlan.goal}</span> Protocol
+                  </h2>
+                  <p className="text-white/50 text-sm max-w-md">
+                    Targeting optimal hypertrophic response and metabolic efficiency based on your 
+                    {form.activity_level} activity profile.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 w-full md:w-auto">
+                  <div className="bg-white/5 p-4 rounded-2xl border border-white/5 text-center min-w-[140px]">
+                    <MdLocalFireDepartment className="text-fire text-2xl mx-auto mb-1" />
+                    <p className="text-2xl font-display font-black text-white">{aiPlan.calories_target}</p>
+                    <p className="text-[10px] text-white/30 uppercase font-bold tracking-tighter">Daily Target Kcal</p>
+                  </div>
+                  <div className="bg-white/5 p-4 rounded-2xl border border-white/5 text-center min-w-[140px]">
+                    <MdTimer className="text-neon text-2xl mx-auto mb-1" />
+                    <p className="text-2xl font-display font-black text-white">{aiPlan.recommended_duration}</p>
+                    <p className="text-[10px] text-white/30 uppercase font-bold tracking-tighter">Session Length</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Weekly Split */}
+            <div>
+              <h3 className="font-display font-bold text-xl mb-6 flex items-center gap-2">
+                <MdTrendingUp className="text-neon" /> Weekly Training Split
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {aiPlan.weekly_schedule.map((day: any, idx: number) => (
+                  <motion.div
+                    key={idx}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: idx * 0.1 }}
+                  >
+                    <Card variant="dark" className="h-full border-neon/10 hover:border-neon/30 transition-colors group">
+                      <div className="flex justify-between items-start mb-4">
+                        <span className="text-xs font-black text-neon uppercase tracking-tighter">{day.day}</span>
+                        <div className="p-2 rounded-xl bg-neon/10 text-neon group-hover:scale-110 transition-transform">
+                          <MdFitnessCenter />
+                        </div>
+                      </div>
+                      <h4 className="font-display font-bold text-lg mb-4 text-white/90">{day.focus}</h4>
+                      <div className="space-y-2">
+                        {day.exercises.map((ex: string, i: number) => (
+                          <div key={i} className="flex items-center gap-2 text-sm text-white/40">
+                            <div className="w-1.5 h-1.5 rounded-full bg-neon/30" />
+                            {ex}
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+
+            {/* AI Insight */}
+            <div className="bg-white/5 rounded-3xl p-6 border border-white/5 flex gap-5 items-start">
+              <div className="w-12 h-12 rounded-2xl bg-neon/10 flex items-center justify-center shrink-0">
+                <MdInfo className="text-2xl text-neon" />
+              </div>
+              <div className="space-y-1">
+                <h4 className="font-bold text-white/90">Neural Fitness Insight</h4>
+                <p className="text-sm text-white/50 leading-relaxed">
+                  Focus on controlled eccentric movements for the first two weeks. Your current 
+                  weight/height ratio suggests high mechanical tension will yield the best {aiPlan.goal.toLowerCase()} 
+                  results. Ensure 48h recovery between same-muscle sessions.
+                </p>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex flex-col sm:flex-row gap-4 pt-4">
+              <Button onClick={savePlan} loading={saving} size="lg" className="flex-1 h-14" icon={<MdSave />}>
+                Save Plan to Profile
+              </Button>
+              <Button onClick={generate} variant="secondary" size="lg" className="flex-1 h-14" icon={<MdRefresh />}>
+                Regenerate Plan
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {!aiPlan && !loading && (
+        <div className="text-center py-20 px-6 rounded-3xl border-2 border-dashed border-white/5">
+          <MdAutoAwesome className="text-7xl mx-auto mb-6 text-white/5" />
+          <h3 className="text-xl font-display font-bold text-white/20">Awaiting Generation Input</h3>
+          <p className="text-white/10 mt-2 max-w-sm mx-auto">
+            Your high-performance training protocol is one click away. Fill out the form above to start.
+          </p>
         </div>
       )}
     </div>

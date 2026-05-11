@@ -31,7 +31,7 @@ exports.listUsers = async (req, res, next) => {
   try {
     const { page = 1, limit = 20, search } = req.query;
     const filter = search
-      ? { $or: [{ name: /search/i }, { email: /search/i }] }
+      ? { $or: [{ name: new RegExp(search, 'i') }, { email: new RegExp(search, 'i') }] }
       : {};
 
     const [users, total] = await Promise.all([

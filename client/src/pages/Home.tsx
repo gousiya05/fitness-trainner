@@ -1,17 +1,22 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   MdFitnessCenter, MdCameraAlt, MdTrendingUp, MdAutoAwesome,
   MdRestaurant, MdMonitorWeight, MdArrowForward, MdBolt, MdCheck,
 } from 'react-icons/md'
+import { BrainCircuit, Activity, Scale, Flame, Apple, LineChart } from 'lucide-react'
+import { SectionHeader } from '@/components/ui/SectionHeader'
+import { FeatureCard } from '@/components/ui/FeatureCard'
+import { WorkoutPlanModal } from '@/components/ui/WorkoutPlanModal'
 
 const FEATURES = [
-  { icon: MdFitnessCenter, title: 'AI Workout Plans',     desc: 'Random Forest ML generates personalized programs for your exact goals.', color: '#00ff87', from: 'from-neon/20', border: 'border-neon/20' },
-  { icon: MdCameraAlt,     title: 'Live Posture AI',       desc: 'MediaPipe + OpenCV detect pose errors and count reps in real time.', color: '#7c3aed', from: 'from-violet/20', border: 'border-violet/20' },
-  { icon: MdMonitorWeight, title: 'BMI Intelligence',      desc: 'Logistic Regression classifies your BMI and assesses health risk instantly.', color: '#06b6d4', from: 'from-cyan-brand/20', border: 'border-cyan-brand/20' },
-  { icon: MdLocalFireDepartment, title: 'Calorie AI',      desc: 'Linear Regression predicts your exact calorie burn per exercise session.', color: '#ff6b35', from: 'from-fire/20', border: 'border-fire/20' },
-  { icon: MdRestaurant,    title: 'Diet Recommendations',  desc: 'AI-curated meal plans and macro targets tailored to your fitness goal.', color: '#a78bfa', from: 'from-violet-light/20', border: 'border-violet-light/20' },
-  { icon: MdTrendingUp,    title: 'Progress Analytics',    desc: 'Interactive charts track streaks, weight trends, and nutrition over time.', color: '#fbbf24', from: 'from-warning/20', border: 'border-warning/20' },
+  { icon: BrainCircuit, title: 'AI Workout Plans',     description: 'Advanced machine learning generates hyper-personalized programs tailored precisely to your evolving fitness goals.', color: '#00ff87' },
+  { icon: Activity,     title: 'Live Posture AI',       description: 'Computer vision algorithms detect biomechanical errors and count your repetitions with pinpoint accuracy in real time.', color: '#7c3aed' },
+  { icon: Scale,        title: 'BMI Intelligence',      description: 'Smart predictive models classify your body metrics and assess long-term health risks instantaneously.', color: '#06b6d4' },
+  { icon: Flame,        title: 'Calorie AI',            description: 'Linear regression models calculate your exact metabolic burn rate per distinct exercise session.', color: '#ff6b35' },
+  { icon: Apple,        title: 'Diet Recommendations',  description: 'AI-curated, macro-optimized meal protocols designed specifically to accelerate your recovery and results.', color: '#a78bfa' },
+  { icon: LineChart,    title: 'Progress Analytics',    description: 'Deep-dive interactive visualizations map your streaks, weight trajectories, and performance history.', color: '#fbbf24' },
 ]
 
 const STATS = [
@@ -28,6 +33,14 @@ function MdLocalFireDepartment(props: any) {
 }
 
 export default function Home() {
+  const [isWorkoutModalOpen, setWorkoutModalOpen] = useState(false)
+
+  const handleFeatureClick = (title: string) => {
+    if (title === 'AI Workout Plans') {
+      setWorkoutModalOpen(true)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-bg-primary text-white overflow-x-hidden">
       {/* Ambient glows */}
@@ -98,34 +111,28 @@ export default function Home() {
       </section>
 
       {/* Features */}
-      <section id="features" className="relative z-10 max-w-7xl mx-auto px-6 pb-24">
-        <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-14">
-          <h2 className="font-display font-bold text-4xl mb-4">
-            Everything to <span className="gradient-text">Transform</span> Your Fitness
-          </h2>
-          <p className="text-white/40 max-w-xl mx-auto">Six AI-powered features working together for your optimal fitness journey.</p>
-        </motion.div>
+      <section id="features" className="relative z-10 max-w-6xl mx-auto px-6 py-24 md:py-32">
+        <SectionHeader 
+          title="AI-Powered Fitness Ecosystem" 
+          subtitle="Advanced machine learning models powering your personal AI trainer."
+          highlight="Fitness Ecosystem"
+        />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {FEATURES.map(({ icon: Icon, title, desc, color, from, border }, i) => (
-            <motion.div
-              key={title}
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.08 }}
-              className={`glass p-6 hover:border-white/15 transition-all hover:-translate-y-1 group bg-gradient-to-br ${from} to-transparent`}
-            >
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform"
-                style={{ background: `${color}20`, border: `1px solid ${color}30`, color }}>
-                <Icon className="text-2xl" />
-              </div>
-              <h3 className="font-display font-bold text-lg mb-2">{title}</h3>
-              <p className="text-white/45 text-sm leading-relaxed">{desc}</p>
-            </motion.div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8 lg:gap-10">
+          {FEATURES.map((feature, i) => (
+            <FeatureCard
+              key={feature.title}
+              {...feature}
+              delay={i * 0.1}
+              badge={feature.title === 'AI Workout Plans' ? 'ML Powered' : undefined}
+              ctaText={feature.title === 'AI Workout Plans' ? 'Generate Plan' : undefined}
+              onCtaClick={feature.title === 'AI Workout Plans' ? () => handleFeatureClick(feature.title) : undefined}
+            />
           ))}
         </div>
       </section>
+
+      <WorkoutPlanModal open={isWorkoutModalOpen} onClose={() => setWorkoutModalOpen(false)} />
 
       {/* Tech stack */}
       <section id="stack" className="relative z-10 max-w-7xl mx-auto px-6 pb-24">

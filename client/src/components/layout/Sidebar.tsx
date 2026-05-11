@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   MdDashboard, MdFitnessCenter, MdMonitorWeight, MdLocalFireDepartment,
   MdSelfImprovement, MdPerson, MdRestaurant, MdLogout, MdAutoAwesome,
+  MdTimeline,
 } from 'react-icons/md'
 import { useAuth } from '@/hooks/useAuth'
 import toast from 'react-hot-toast'
@@ -14,6 +15,7 @@ const NAV_ITEMS = [
   { path: '/calories',  label: 'Calories',    icon: MdLocalFireDepartment },
   { path: '/diet',      label: 'Diet Plan',   icon: MdRestaurant },
   { path: '/posture',   label: 'Posture AI',  icon: MdSelfImprovement },
+  { path: '/progress',  label: 'Progress',    icon: MdTimeline },
   { path: '/profile',   label: 'Profile',     icon: MdPerson },
 ]
 

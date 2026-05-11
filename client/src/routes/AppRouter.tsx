@@ -13,6 +13,7 @@ import Calories    from '@/pages/Calories'
 import Diet        from '@/pages/Diet'
 import Posture     from '@/pages/Posture'
 import Profile     from '@/pages/Profile'
+import Progress    from '@/pages/Progress'
 
 export default function AppRouter() {
   return (
@@ -30,6 +31,7 @@ export default function AppRouter() {
         <Route path="/calories"  element={<Calories />} />
         <Route path="/diet"      element={<Diet />} />
         <Route path="/posture"   element={<Posture />} />
+        <Route path="/progress"  element={<Progress />} />
         <Route path="/profile"   element={<Profile />} />
       </Route>
 
